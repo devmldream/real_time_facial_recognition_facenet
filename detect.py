@@ -68,22 +68,46 @@ if __name__ == "__main__":
     encodings_path = 'encodings/encodings.pkl'
     face_detector = mtcnn.MTCNN()
     encoding_dict = load_pickle(encodings_path)
-    
-    cap = cv2.VideoCapture(0)
 
-    while cap.isOpened():
-        ret,frame = cap.read()
+    img = cv2.imread('IMG_9520.PNG')
 
-        if not ret:
-            print("CAM NOT OPEND") 
-            break
-        
-        frame= detect(frame , face_detector , face_encoder , encoding_dict)
+    if img is None:
+        print("Image not loaded. Check the path.")
+    else:
+        image = detect(img, face_detector, face_encoder, encoding_dict)
 
-        cv2.imshow('camera', frame)
+        screen_res = 1280, 720  # Example screen resolution, adjust as needed
+        scale_width = screen_res[0] / image.shape[1]
+        scale_height = screen_res[1] / image.shape[0]
+        scale = min(scale_width, scale_height)
+        window_width = int(img.shape[1] * scale)
+        window_height = int(img.shape[0] * scale)
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+        resized_image = cv2.resize(image, (window_width, window_height))
+        cv2.imshow('Resized Image', resized_image)
+
+        # cv2.imshow('camera', image)
+        cv2.waitKey(0)  # Wait indefinitely for a key press
+        cv2.destroyAllWindows()  # Close all OpenCV windows
+        print("Window closed. Exiting program.")
+
+    # cap = cv2.VideoCapture(0)
+    #
+    # while cap.isOpened():
+    #     ret,frame = cap.read()
+    #
+    #     if not ret:
+    #         print("CAM NOT OPEND")
+    #         break
+    #
+    #     frame= detect(frame , face_detector , face_encoder , encoding_dict)
+    #
+    #     cv2.imshow('camera', frame)
+    #
+    #     if cv2.waitKey(1) & 0xFF == ord('q'):
+    #         break
+
+
 
     
 
