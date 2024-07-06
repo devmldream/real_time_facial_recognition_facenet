@@ -6,6 +6,7 @@ from train_v2 import normalize,l2_normalizer
 from scipy.spatial.distance import cosine
 from tensorflow.keras.models import load_model
 import pickle
+import os
 
 
 confidence_t=0.99
@@ -59,9 +60,8 @@ def detect(img ,detector,encoder,encoding_dict):
     return img 
 
 
-
-if __name__ == "__main__":
-    required_shape = (160,160)
+def generate_recognized_image(img_path, save_path):
+    required_shape = (160, 160)
     face_encoder = InceptionResNetV2()
     path_m = "facenet_keras_weights.h5"
     face_encoder.load_weights(path_m)
@@ -69,7 +69,9 @@ if __name__ == "__main__":
     face_detector = mtcnn.MTCNN()
     encoding_dict = load_pickle(encodings_path)
 
-    img = cv2.imread('IMG_9520.PNG')
+    # img = cv2.imread('IMG_9520.PNG')
+    img = cv2.imread(img_path)
+
 
     if img is None:
         print("Image not loaded. Check the path.")
@@ -84,31 +86,61 @@ if __name__ == "__main__":
         window_height = int(img.shape[0] * scale)
 
         resized_image = cv2.resize(image, (window_width, window_height))
-        cv2.imshow('Resized Image', resized_image)
+        # cv2.imshow('Resized Image', resized_image)
+        #
+        # # cv2.imshow('camera', image)
+        # cv2.waitKey(0)  # Wait indefinitely for a key press
+        # cv2.destroyAllWindows()  # Close all OpenCV windows
+        # print("Window closed. Exiting program.")
 
-        # cv2.imshow('camera', image)
-        cv2.waitKey(0)  # Wait indefinitely for a key press
-        cv2.destroyAllWindows()  # Close all OpenCV windows
-        print("Window closed. Exiting program.")
+        cv2.imwrite(save_path, resized_image)
+        print(f"Image saved at {save_path}")
 
-    cap = cv2.VideoCapture(0)
+        return save_path
 
-    while cap.isOpened():
-        ret,frame = cap.read()
+    # # Load your video
+    # input_video_path = 'path_to_your_input_video.mp4'
+    # cap = cv2.VideoCapture(input_video_path)
+    #
+    # # Check if video opened successfully
+    # if not cap.isOpened():
+    #     print("Error opening video file")
+    #     exit(1)
+    #
+    # # Setup Video Writer to save output
+    # fourcc = cv2.VideoWriter_fourcc(*'XVID')  # Codec used to compress the frames
+    # frame_width = int(cap.get(3))
+    # frame_height = int(cap.get(4))
+    # frame_rate = int(cap.get(cv2.CAP_PROP_FPS))
+    #
+    # output_video_path = os.path.join(save_dir, 'output_video.avi')
+    # out = cv2.VideoWriter(output_video_path, fourcc, frame_rate, (frame_width, frame_height))
+    #
+    # while cap.isOpened():
+    #     ret, frame = cap.read()
+    #
+    #     if not ret:
+    #         print("End of video file reached or can't fetch the frames")
+    #         break
+    #
+    #     # Process the frame for face detection
+    #     processed_frame = detect(frame, face_detector, face_encoder, encoding_dict)
+    #
+    #     # Display the frame
+    #     cv2.imshow('Processed Video', processed_frame)
+    #
+    #     # Write the frame into the file 'output_video.avi'
+    #     out.write(processed_frame)
+    #
+    #     if cv2.waitKey(1) & 0xFF == ord('q'):
+    #         break
+    #
+    # # Release everything when done
+    # cap.release()
+    # out.release()
+    # cv2.destroyAllWindows()
+    # print(f"Processed video is saved at {output_video_path}")
 
-        if not ret:
-            print("CAM NOT OPEND")
-            break
 
-        frame= detect(frame , face_detector , face_encoder , encoding_dict)
-
-        cv2.imshow('camera', frame)
-
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-
-
-    
-
-
+if __name__ == "__main__":
+    generate_recognized_image('IMG_9520.PNG', '/home/artem/dev/project/Real-time-face-recognition-Using-Facenet')
