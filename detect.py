@@ -35,6 +35,7 @@ def load_pickle(path):
 def detect(img ,detector,encoder,encoding_dict):
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     results = detector.detect_faces(img_rgb)
+    name = ''
     for res in results:
         if res['confidence'] < confidence_t:
             continue
@@ -57,7 +58,7 @@ def detect(img ,detector,encoder,encoding_dict):
             cv2.rectangle(img, pt_1, pt_2, (0, 255, 0), 2)
             cv2.putText(img, name + f'__{distance:.2f}', (pt_1[0], pt_1[1] - 5), cv2.FONT_HERSHEY_SIMPLEX, 1,
                         (0, 200, 200), 2)
-    return img 
+    return img, name
 
 
 def generate_recognized_image(img_path, save_path):
@@ -72,11 +73,10 @@ def generate_recognized_image(img_path, save_path):
     # img = cv2.imread('IMG_9520.PNG')
     img = cv2.imread(img_path)
 
-
     if img is None:
         print("Image not loaded. Check the path.")
     else:
-        image = detect(img, face_detector, face_encoder, encoding_dict)
+        image, name = detect(img, face_detector, face_encoder, encoding_dict)
 
         screen_res = 1280, 720  # Example screen resolution, adjust as needed
         scale_width = screen_res[0] / image.shape[1]
@@ -93,10 +93,14 @@ def generate_recognized_image(img_path, save_path):
         # cv2.destroyAllWindows()  # Close all OpenCV windows
         # print("Window closed. Exiting program.")
 
-        cv2.imwrite(save_path, resized_image)
-        print(f"Image saved at {save_path}")
+        # Construct the output path with the file name and an extension
+        output_file_path = os.path.join(save_path, os.path.basename(img_path))
 
-        return save_path
+        result = cv2.imwrite(output_file_path, resized_image)
+        if result:
+            print(f"Image successfully saved at {save_path}-1.jpg")
+        else:
+            print("Failed to save the image.")
 
     # # Load your video
     # input_video_path = 'path_to_your_input_video.mp4'
@@ -142,5 +146,24 @@ def generate_recognized_image(img_path, save_path):
     # print(f"Processed video is saved at {output_video_path}")
 
 
-if __name__ == "__main__":
-    generate_recognized_image('IMG_9520.PNG', '/home/artem/dev/project/Real-time-face-recognition-Using-Facenet')
+# Specify the directory containing the images
+image_directory = 'processed_3'
+output_directory = 'recognized_3'
+
+# Create output directory if it doesn't exist
+if not os.path.exists(output_directory):
+    os.makedirs(output_directory)
+
+# Loop through all files in the directory
+for filename in os.listdir(image_directory):
+    # Check for file extension
+    if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+        file_path = os.path.join(image_directory, filename)
+        generate_recognized_image(file_path, output_directory)
+        print(f'Processed {filename}')
+
+print("done")
+
+
+# if __name__ == "__main__":
+#     generate_recognized_image('images/20.jpg', '/home/artem/dev/project/Real-time-face-recognition-Using-Facenet')
