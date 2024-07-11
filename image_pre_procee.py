@@ -65,7 +65,7 @@ def adjust_brightness_contrast(image, alpha=1.0, beta=50):
     return adjusted
 
 
-def process_image(img_path, output_path):
+def process_image(img_path):
     # Read the image
     image = cv2.imread(img_path)
 
@@ -74,26 +74,26 @@ def process_image(img_path, output_path):
     processed_image = histogram_equlization(image)
     # processed_image = adjust_brightness_contrast(processed_image_1)
 
-    # Construct the output path with the file name and an extension
-    output_file_path = os.path.join(output_directory, os.path.basename(img_path))
+    # Split the original path and file extension
+    base, extension = os.path.splitext(img_path)
+
+    # Construct the new output file name by adding '-processed' before the extension
+    output_file_path = f'{base}-processed{extension}'
 
     cv2.imwrite(output_file_path, processed_image)
+    print("output_path", output_file_path)
+    return output_file_path
 
-
-# Specify the directory containing the images
-image_directory = 'images'
-output_directory = 'processed'
-
-# Create output directory if it doesn't exist
-if not os.path.exists(output_directory):
-    os.makedirs(output_directory)
-
-# Loop through all files in the directory
-for filename in os.listdir(image_directory):
-    # Check for file extension
-    if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-        file_path = os.path.join(image_directory, filename)
-        process_image(file_path, output_directory)
-        print(f'Processed {filename}')
-
-print("done")
+#
+# # Specify the directory containing the images
+# image_directory = 'images'
+#
+# # Loop through all files in the directory
+# for filename in os.listdir(image_directory):
+#     # Check for file extension
+#     if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+#         file_path = os.path.join(image_directory, filename)
+#         process_image(file_path)
+#         print(f'Processed {filename}')
+#
+# print("done")

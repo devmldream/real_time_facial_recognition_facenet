@@ -8,6 +8,8 @@ from tensorflow.keras.models import load_model
 import pickle
 import os
 
+from image_pre_procee import process_image
+
 
 confidence_t=0.99
 recognition_t=0.5
@@ -61,7 +63,8 @@ def detect(img ,detector,encoder,encoding_dict):
     return img, name
 
 
-def generate_recognized_image(img_path, save_path):
+def generate_recognized_image(source_img_path, save_path):
+    img_path = process_image(source_img_path, )
     required_shape = (160, 160)
     face_encoder = InceptionResNetV2()
     path_m = "facenet_keras_weights.h5"
@@ -93,14 +96,16 @@ def generate_recognized_image(img_path, save_path):
         # cv2.destroyAllWindows()  # Close all OpenCV windows
         # print("Window closed. Exiting program.")
 
-        # Construct the output path with the file name and an extension
-        output_file_path = os.path.join(save_path, os.path.basename(img_path))
-
-        result = cv2.imwrite(output_file_path, resized_image)
+        result = cv2.imwrite(save_path, resized_image)
         if result:
-            print(f"Image successfully saved at {save_path}-1.jpg")
+            print(f"Image successfully saved at {save_path}.jpg")
         else:
             print("Failed to save the image.")
+
+        print("name", name)
+        if name is None:
+            name = "Unkown"
+        return name
 
     # # Load your video
     # input_video_path = 'path_to_your_input_video.mp4'
@@ -147,8 +152,8 @@ def generate_recognized_image(img_path, save_path):
 
 
 # Specify the directory containing the images
-image_directory = 'processed_3'
-output_directory = 'recognized_3'
+image_directory = 'processed'
+output_directory = 'recognized_4'
 
 # Create output directory if it doesn't exist
 if not os.path.exists(output_directory):
