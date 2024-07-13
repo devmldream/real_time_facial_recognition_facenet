@@ -150,24 +150,24 @@ def generate_recognized_image(source_img_path, save_path):
     # cv2.destroyAllWindows()
     # print(f"Processed video is saved at {output_video_path}")
 
-
-# Specify the directory containing the images
-image_directory = 'processed'
-output_directory = 'recognized_4'
-
-# Create output directory if it doesn't exist
-if not os.path.exists(output_directory):
-    os.makedirs(output_directory)
-
-# Loop through all files in the directory
-for filename in os.listdir(image_directory):
-    # Check for file extension
-    if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-        file_path = os.path.join(image_directory, filename)
-        generate_recognized_image(file_path, output_directory)
-        print(f'Processed {filename}')
-
-print("done")
+#
+# # Specify the directory containing the images
+# image_directory = 'processed'
+# output_directory = 'recognized_4'
+#
+# # Create output directory if it doesn't exist
+# if not os.path.exists(output_directory):
+#     os.makedirs(output_directory)
+#
+# # Loop through all files in the directory
+# for filename in os.listdir(image_directory):
+#     # Check for file extension
+#     if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+#         file_path = os.path.join(image_directory, filename)
+#         generate_recognized_image(file_path, output_directory)
+#         print(f'Processed {filename}')
+#
+# print("done")
 
 
 # if __name__ == "__main__":

@@ -2,7 +2,9 @@ import paho.mqtt.client as mqtt
 import json
 import sqlite3
 import time
+import os
 from detect import generate_recognized_image
+
 
 def on_connect(client, userdata, flags, rc):
     print("Connected with result code " + str(rc))
@@ -13,8 +15,6 @@ def on_message(client, userdata, msg):
     
     payload = msg.payload.decode()
 
-    # print(f"Received message '{msg.payload.decode()}' on topic '{msg.topic}' with QoS {msg.qos}")
-    
     try:
         data = json.loads(payload)
         print("Payload as JSON:", data)
@@ -27,12 +27,9 @@ def on_message(client, userdata, msg):
             if 'person' in data.get('before', {}).get('label', None):
                 print("Person detected!")
 
-                handle_person_detected(data)
-
                 # need to alter later
                 event_id = before_id
                 print("event_id", event_id)
-
                 process_event(event_id)
 
     except json.JSONDecodeError:
@@ -41,131 +38,141 @@ def on_message(client, userdata, msg):
     if 'motion' in payload:
         print("Motion detected!")
 
-def handle_person_detected(data):
 
-    print("Handling person detection with data:", data)
+def handle_person_detected(event_id):
 
-    if 'bbox' in data:
-        print("Bounding bos coordinates:", data['bbox'])
+    # Assuming the function generate_recognized_image returns the recognized name
+    recognized_name = generate_recognized_image(
+        f'/home/admin/storage/clips/GarageCamera-{event_id}-clean.png',
+        f'/home/admin/storage/clips/GarageCamera-{event_id}-rec.jpg'
+    )
+    print("Recognized name:", recognized_name)
+    return recognized_name
 
-# def getEventsFromDB(event_id):
-#     frigate_db_con = sqlite3.connect('/home/admin/config/frigate.db')
-#     cursor = frigate_db_con.cursor()
-#     cursor.execute(f"SELECT * FROM event WHERE id='{event_id}'")
-#
-#     rows = cursor.fetchall()
-#     for row in rows:
-#         print(row)
-#
-#     cursor.execute("PRAGMA table_info(event)")
-#     columns = [column[1] for column in cursor.fetchall()]
-#
-#     # fields to be added.
-#     fieldsToBeAdded = ['recording_path', 'face', 'recognized_path']
-#
-#     for fieldName in fieldsToBeAdded:
-#         if fieldName not in columns:
-#             cursor.execute(f"ALTER TABLE event ADD COLUMN {fieldName} TEXT")
-#             print(f"Column '{fieldName}' added.")
-#
-#     face_name = generate_recognized_image(
-#         f'/home/admin/storage/clips/GarageCamera-{event_id}.jpg',
-#         f'/home/admin/storage/clips/GarageCamera-{event_id}-rec.jpg'
-#     )
-#
-#     cursor.execute("""
-#         UPDATE event
-#         SET recording_path = (
-#             SELECT path
-#             FROM recordings
-#             WHERE event.start_time >= recordings.start_time
-#               AND event.start_time <= recordings.end_time
-#             ORDER BY recordings.start_time DESC
-#             LIMIT 1
-#         )
-#         WHERE id = ? AND EXISTS (
-#             SELECT 1
-#             FROM recordings
-#             WHERE event.start_time >= recordings.start_time
-#               AND event.start_time <= recordings.end_time
-#         );
-#     """, (event_id,))
-#
-#     # update the recognized path
-#     cursor.execute("""
-#         UPDATE event
-#         SET recognized_path = ?, face = ?
-#         WHERE id = ?;
-#     """, (f'/home/admin/storage/clips/GarageCamera-{event_id}-rec.jpg', face_name, event_id))
-#
-#     frigate_db_con.commit()
-#     frigate_db_con.close()
+
+def setup_database(connection):
+    """ Set up the database tables if they do not exist. """
+    cursor = connection.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS event (
+            id TEXT PRIMARY KEY, 
+            label TEXT, 
+            camera TEXT, 
+            sub_label TEXT, 
+            score REAL, 
+            top_score REAL
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS recordings (
+            id TEXT PRIMARY KEY, 
+            event_id TEXT,
+            path TEXT, 
+            start_time TEXT, 
+            end_time TEXT, 
+            duration REAL,
+            FOREIGN KEY (event_id) REFERENCES event(id)
+        )
+    """)
+    connection.commit()
+
+
+def insert_event_if_not_exists(cursor, event_data):
+    if len(event_data) != 6:
+        print("Error: Incorrect number of data elements supplied for the event.")
+        return
+
+    cursor.execute("SELECT id FROM event WHERE id = ?", (event_data[0],))
+    if cursor.fetchone() is None:
+        cursor.execute("INSERT INTO event (id, label, camera, sub_label, score, top_score) VALUES (?, ?, ?, ?, ?, ?)", event_data)
+        print("Inserted new event:", event_data)
+    else:
+        print("Event already exists:", event_data[0])
+
+
+def insert_recordings(cursor, recordings_data, event_id):
+    """ Insert new recordings into the database. """
+    for record in recordings_data:
+        cursor.execute("SELECT id FROM recordings WHERE id = ?", (record[0],))
+        if cursor.fetchone() is None:
+            cursor.execute("INSERT INTO recordings VALUES (?, ?, ?, ?, ?, ?)", (record[0], event_id) + record[1:])
+            print("Inserted new recording for event_id:", event_id)
 
 
 def process_event(event_id):
 
-    time.sleep(5)
+    path = f'/home/admin/storage/clips/GarageCamera-{event_id}-clean.png'
+    if wait_for_file_creation(path):
+        print("Proceed with file processing.")
 
-    name = generate_recognized_image(
-        f'/home/admin/storage/clips/GarageCamera-{event_id}-clean.png',
-        f'/home/admin/storage/clips/GarageCamera-{event_id}-rec.jpg'
-    )
-    print("name", name)
-    publish_face_labels(client, name, topic)
+        # Connect to the existing Frigate database
+        frigate_db_con = sqlite3.connect('/home/admin/config/frigate.db')
+        cursor = frigate_db_con.cursor()
 
-    # Open connection to the existing Frigate database
-    frigate_db_con = sqlite3.connect('/home/admin/config/frigate.db')
-    cursor = frigate_db_con.cursor()
+        # Fetch event data
+        cursor.execute("SELECT id, label, camera, score, top_score FROM event WHERE id = ?", (event_id,))
+        event_data = cursor.fetchone()
 
-    # Fetch event data
-    cursor.execute("SELECT id, label, camera, sub_label, score, top_score FROM event WHERE id = ?",
-                   (event_id,))
-    event_data = cursor.fetchone()
+        if event_data is None:
+            print("No event data found for event_id:", event_id)
+            return
 
-    # Fetch recording data where the event falls within the recording duration
-    cursor.execute("""
-        SELECT id, path, start_time, end_time, duration FROM recordings
-        WHERE start_time <= (SELECT start_time FROM event WHERE id = ?)
-          AND end_time >= (SELECT end_time FROM event WHERE id = ?)
-    """, (event_id, event_id))
-    recording_data = cursor.fetchall()
+        # Include recognized name as sub_label
+        recognized_name = handle_person_detected({"event_id": event_id})  # Add more parameters if needed
+        if recognized_name is None:
+            print("No recognized name found for event_id:", event_id)
+            return
 
-    # Close connection to the Frigate database
-    frigate_db_con.close()
+        # Ensure the tuple has exactly 6 elements
+        event_data_with_sub_label = (
+        event_data[0], event_data[1], event_data[2], recognized_name, event_data[3], event_data[4])
 
-    # Create and connect to the new Events database
-    events_db_con = sqlite3.connect('/home/admin/config/events.db')
-    events_cursor = events_db_con.cursor()
+        frigate_db_con.close()
 
-    # Create tables if they don't exist
-    events_cursor.execute("""
-        CREATE TABLE IF NOT EXISTS event (
-            id TEXT, label TEXT, camera TEXT, sub_label TEXT, score REAL, 
-            top_scor REAL
-        )
-    """)
-    events_cursor.execute("""
-        CREATE TABLE IF NOT EXISTS recordings (
-            id TEXT, path TEXT, start_time TEXT, end_time TEXT, duration REAL
-        )
-    """)
+        # Connect to the Events database
+        events_db_con = sqlite3.connect('/home/admin/config/events.db')
+        setup_database(events_db_con)
+        events_cursor = events_db_con.cursor()
 
-    # Insert data into the new database
-    events_cursor.execute("INSERT INTO event VALUES (?, ?, ?, ?, ?, ?)", event_data)
-    events_cursor.executemany("INSERT INTO recordings VALUES (?, ?, ?, ?, ?)", recording_data)
-    events_db_con.commit()
-    events_db_con.close()
+        # Insert the event and recordings into the database
+        insert_event_if_not_exists(events_cursor, event_data_with_sub_label)
+        events_db_con.commit()
+        events_db_con.close()
 
+        print("Event processing completed for:", event_id)
 
-# event_id = '1720132207.804948-3r5wOf'
-# getEventsFromDB(event_id)
-# process_event(event_id)
+    else:
+        print("File was not created in time.")
 
 
 def publish_face_labels(client, label, topic):
     message = json.dumps({"label": label})
     client.publish(topic, payload=message)
     print(f"Published {label} to {topic}")
+
+
+def wait_for_file_creation(file_path, timeout=300, check_interval=1):
+    """
+    Waits for a specific file to be created within a given timeout.
+
+    Parameters:
+    file_path (str): The path to the file to wait for.
+    timeout (int): The maximum time to wait in seconds. Defaults to 300 seconds.
+    check_interval (int): How often to check for the file in seconds. Defaults to 2 seconds.
+
+    Returns:
+    bool: True if the file is created within the timeout, False otherwise.
+    """
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        if os.path.exists(file_path):
+            print(f"File found: {file_path}")
+            return True
+        else:
+            print(f"File not found: {file_path}, checking again in {check_interval} seconds.")
+            time.sleep(check_interval)
+    print(f"Timeout reached. File not found: {file_path}")
+    return False
 
 
 topic = "frigate/facenet/faces"
@@ -177,9 +184,5 @@ client.on_message = on_message
 client.username_pw_set("admin", "1BeachHouse@2023")
 
 client.connect("192.168.0.63", 1883, 60)
-
-# label = "unknown"
-#
-# publish_face_labels(client, label, topic)
 
 client.loop_forever()

@@ -1,0 +1,8 @@
+Tensorflow>=2.0, <3.0
+numpy
+opencv-python
+mtcnn
+scikit-learn
+scipy
+matplotlib
+flask
